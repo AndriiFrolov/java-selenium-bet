@@ -3,13 +3,14 @@ package org.example;
 
 import com.codeborne.selenide.Configuration;
 import com.codeborne.selenide.ElementsCollection;
+import com.codeborne.selenide.SelenideElement;
+import com.codeborne.selenide.WebDriverRunner;
 import com.opencsv.CSVWriter;
 import com.opencsv.bean.StatefulBeanToCsv;
 import com.opencsv.bean.StatefulBeanToCsvBuilder;
 import com.opencsv.exceptions.CsvDataTypeMismatchException;
 import com.opencsv.exceptions.CsvRequiredFieldEmptyException;
-import io.github.bonigarcia.wdm.WebDriverManager;
-import io.github.bonigarcia.wdm.config.OperatingSystem;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.*;
 import org.openqa.selenium.By;
 
@@ -21,10 +22,9 @@ import java.util.List;
 
 import static com.codeborne.selenide.Selenide.*;
 
-public class BetAppSel {
+public class BetAppSimple {
     public static final String GAME_EL = "//div[@class='subpage-game-row-mobile']";
-    public static final String CONTAINER_EL = "//div[@class='bet-card pitkaveto-container']";
-    public static final String LEAGUE_EL = "//div[@class='pitkaveto-subpage-bet-row']";
+
     static String currentDirectory = System.getProperty("user.dir");
     public static final String PATH_CSV = currentDirectory + File.separator + "result.csv";
     public static final String PATH_EXCEL = currentDirectory + File.separator + "result.xlsx";
@@ -38,7 +38,8 @@ public class BetAppSel {
             "https://www.veikkaus.fi/fi/vedonlyonti?t=1-1-8_Kansallinen%20Liiga",
 
             //other
-            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-5-1_Espanja%3B1-5-2_Espanja"
+            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-5-1_Espanja%3B1-5-2_Espanja",
+            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-2-1_Valioliiga"
     );
 
     static String URL = "https://www.bmbets.com/search/?query=";
@@ -49,91 +50,61 @@ public class BetAppSel {
         Configuration.headless = false; //Set to false if you want to see browser opening
         List<BetResult> results = new ArrayList<>();
         for (int j = 0; j < urls.size(); j++) {
-            log("Opening url " + (j + 1) + " out of " + urls.size() + ": " + urls.get(j));
-            waitFor(10);
-            open(urls.get(j));
+            String url = urls.get(j);
+            log("Opening url " + (j + 1) + " out of " + urls.size() + ": " + url);
+            open(url);
+            waitFor(5);
+
             if (j == 0) {
                 log("Accepting cookies ");
                 $(By.id("save-all-action")).click();
             }
-            ElementsCollection containers = getContainers();
-            log("-- Found " + containers.size() + " betting containers (that have expand button)");
-            for (int l = 1; l <= containers.size(); l++) {
-                log("Processing container " + l);
-                ElementsCollection expandButton = $$(By.xpath(String.format("(//div[@class='bet-card__footer']/button)[%d]", l)));
-                if (expandButton.size() > 1) {
-                    log("!! Found expand buttons for container - " + expandButton.size());
+            String currentUrl = WebDriverRunner.getWebDriver().getCurrentUrl();
+            if (currentUrl.equals(url)) {
+                expandAll();
+                ElementsCollection games = $$(By.xpath(GAME_EL));
+                log("------ Found games - " + games.size());
+                for (int i = 1; i <= games.size(); i++) {
+                    log("-------- Fetching data for game " + i);
+                    BetResult betResult = new BetResult(url);
+                    String teamA = getIfPresent(i, "//span[contains(@class, 'team--home')]");
+                    betResult.setTeamA(teamA);
+                    betResult.setTeamB(getIfPresent(i, "//span[contains(@class, 'team--away')]"));
+
+                    String date = getIfPresent(i, "//span[contains(@class, 'date-label')]");
+                    betResult.setDate(date);
+                    betResult.setTime(getIfPresent(i, String.format("//div[contains(@class, 'time-label')]/span[%d]", StringUtils.isEmpty(date) ? 1 : 2)));
+                    betResult.setOdsFor1(getIfPresent(i, "//div[contains(@class, 'buttons-three-columns')]/button[1]"));
+                    betResult.setOdsForX(getIfPresent(i, "//div[contains(@class, 'buttons-three-columns')]/button[2]"));
+                    betResult.setOdsFor2(getIfPresent(i, "//div[contains(@class, 'buttons-three-columns')]/button[3]"));
+
+                    betResult.setDivision(games.get(i - 1).$(By.xpath("..//..//h3")).getText());
+
+                    betResult.setLink(URL + transformA(teamA));
+
+                    results.add(betResult);
                 }
-                if (expandButton.size() == 1) {
-                    expandButton.get(0).click();
-                }
-                ElementsCollection divisions = getDivisions(l);
-                for (int k = 1; k <= divisions.size(); k++) {
-                    String league = "(" + CONTAINER_EL + LEAGUE_EL + ")[" + k + "]";
-
-                    String divisionName = getIfPresentNotRoot(league + "//div[@class='subpage-bet-row__title-row__sport-title']/h3");
-                    log("---- Fetching data for division " + k + "(" + divisionName + ")");
-                    ElementsCollection games = $$(By.xpath(league + GAME_EL));
-                    log("------ Found games - " + games.size());
-                    for (int i = 1; i <= games.size(); i++) {
-                        log("-------- Fetching data for game " + i);
-                        BetResult betResult = new BetResult(urls.get(j));
-                        String teamA = getIfPresent(i, "//span[contains(@class, 'team--home')]");
-                        betResult.setTeamA(teamA);
-                        betResult.setTeamB(getIfPresent(i, "//span[contains(@class, 'team--away')]"));
-
-                        betResult.setDate(getIfPresent(i, "//span[contains(@class, 'date-label')]"));
-                        betResult.setTime(getIfPresent(i, "//div[contains(@class, 'time-label')]/span[2]"));
-                        betResult.setOdsFor1(getIfPresent(i, "//div[contains(@class, 'buttons-three-columns')]/button[1]"));
-                        betResult.setOdsForX(getIfPresent(i, "//div[contains(@class, 'buttons-three-columns')]/button[2]"));
-                        betResult.setOdsFor2(getIfPresent(i, "//div[contains(@class, 'buttons-three-columns')]/button[3]"));
-
-                        betResult.setDivision(divisionName);
-
-                        betResult.setLink(URL + transformA(teamA));
-
-                        results.add(betResult);
-                    }
-                }
+            } else {
+                log("URL " + url + " redirected to " + currentUrl + ", so skipping it" );
             }
+
         }
         saveCSV(results);
         saveExcel(results);
     }
 
-    private static ElementsCollection getContainers() {
-        ElementsCollection containers = $$(By.xpath(CONTAINER_EL));
-        if (containers.size() == 0) {
-            sleep(10); //loads slowly sometimes
-            containers = $$(By.xpath(CONTAINER_EL));
-        }
-        if (containers.size() == 0) {
-            sleep(20); //loads slowly sometimes
-            containers = $$(By.xpath(CONTAINER_EL));
-        }
-        if (containers.size() == 0) {
-            log("---- Found 0 containers by xpath " + CONTAINER_EL);
-        } else {
-            log("---- Found containers - " + containers.size());
-        }
-        return containers;
-    }
+    private static void expandAll() {
+        for (SelenideElement el : $$(By.xpath("//div[@class='bet-card__footer']/button"))) {
+            try {
+                if (el.isDisplayed()){
+                    el.click();
+                }
+            } catch (Exception e) {
+                log("Could not expand one button");
 
-    private static ElementsCollection getDivisions(int l) {
-        String xpath = String.format("((%s)[%d])%s", CONTAINER_EL, l, LEAGUE_EL);
-        ElementsCollection divisions;
-        int attempt = 0;
-        do {
-           attempt++;
-           sleep(5);
-           divisions = $$(By.xpath(xpath));
-       } while (divisions.size() == 0 && attempt < 5);
-        if (divisions.size() == 0) {
-            log("---- Found 0 divisions/leagues by xpath " + xpath);
-        } else {
-            log("---- Found divisions/leagues - " + divisions.size());
+            }
         }
-        return divisions;
+
     }
 
     private static void saveExcel(List<BetResult> results) {
@@ -243,3 +214,5 @@ public class BetAppSel {
 
 
 }
+
+
