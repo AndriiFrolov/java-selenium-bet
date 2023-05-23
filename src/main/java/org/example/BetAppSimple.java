@@ -16,9 +16,11 @@ import org.openqa.selenium.By;
 
 import java.io.*;
 import java.net.URLEncoder;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.nio.charset.StandardCharsets;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 
 import static com.codeborne.selenide.Selenide.*;
 
@@ -35,14 +37,13 @@ public class BetAppSimple {
             "https://www.veikkaus.fi/fi/vedonlyonti?t=1-1-19_Kakkonen%20Lohko%20A",
             "https://www.veikkaus.fi/fi/vedonlyonti?t=1-1-20_Kakkonen%20Lohko%20B",
             "https://www.veikkaus.fi/fi/vedonlyonti?t=1-1-21_Kakkonen%20Lohko%20C",
-            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-1-8_Kansallinen%20Liiga",
-
-            //other
-            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-5-1_Espanja%3B1-5-2_Espanja",
-            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-2-1_Valioliiga"
+            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-1-8_Kansallinen%20Liiga"
     );
 
     static String URL = "https://www.bmbets.com/search/?query=";
+
+    // Define the desired date format
+    static DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     public static void main(String[] args) throws Exception {
         Configuration.webdriverLogsEnabled = false;
@@ -53,7 +54,7 @@ public class BetAppSimple {
             String url = urls.get(j);
             log("Opening url " + (j + 1) + " out of " + urls.size() + ": " + url);
             open(url);
-            waitFor(5);
+            waitABit();
 
             if (j == 0) {
                 log("Accepting cookies ");
@@ -63,6 +64,10 @@ public class BetAppSimple {
             if (currentUrl.equals(url)) {
                 expandAll();
                 ElementsCollection games = $$(By.xpath(GAME_EL));
+                if (games.size() == 0) {
+                    waitABit();
+                    games = $$(By.xpath(GAME_EL));
+                }
                 log("------ Found games - " + games.size());
                 for (int i = 1; i <= games.size(); i++) {
                     log("-------- Fetching data for game " + i);
@@ -72,7 +77,9 @@ public class BetAppSimple {
                     betResult.setTeamB(getIfPresent(i, "//span[contains(@class, 'team--away')]"));
 
                     String date = getIfPresent(i, "//span[contains(@class, 'date-label')]");
-                    betResult.setDate(date);
+                    String dateToShow = getDate(date);
+
+                    betResult.setDate(dateToShow);
                     betResult.setTime(getIfPresent(i, String.format("//div[contains(@class, 'time-label')]/span[%d]", StringUtils.isEmpty(date) ? 1 : 2)));
                     betResult.setOdsFor1(getIfPresent(i, "//div[contains(@class, 'buttons-three-columns')]/button[1]"));
                     betResult.setOdsForX(getIfPresent(i, "//div[contains(@class, 'buttons-three-columns')]/button[2]"));
@@ -85,7 +92,7 @@ public class BetAppSimple {
                     results.add(betResult);
                 }
             } else {
-                log("URL " + url + " redirected to " + currentUrl + ", so skipping it" );
+                log("URL " + url + " redirected to " + currentUrl + ", so skipping it");
             }
 
         }
@@ -96,7 +103,7 @@ public class BetAppSimple {
     private static void expandAll() {
         for (SelenideElement el : $$(By.xpath("//div[@class='bet-card__footer']/button"))) {
             try {
-                if (el.isDisplayed()){
+                if (el.isDisplayed()) {
                     el.click();
                 }
             } catch (Exception e) {
@@ -150,7 +157,7 @@ public class BetAppSimple {
                 cell = dataRow.createCell(colNum++);
                 cell.setCellValue(betResult.getLink());
 
-                cell = dataRow.createCell(colNum++);
+                cell = dataRow.createCell(colNum);
                 cell.setCellValue(betResult.getUrl());
             }
 
@@ -166,7 +173,7 @@ public class BetAppSimple {
 
     private static void saveCSV(List<BetResult> results) throws
             IOException, CsvDataTypeMismatchException, CsvRequiredFieldEmptyException {
-        try (Writer writer = new FileWriter(PATH_CSV.toString())) {
+        try (Writer writer = new FileWriter(PATH_CSV)) {
 
             StatefulBeanToCsv<BetResult> sbc = new StatefulBeanToCsvBuilder<BetResult>(writer)
                     .withQuotechar('\'')
@@ -196,20 +203,75 @@ public class BetAppSimple {
         System.out.println(message);
     }
 
-    private static void waitFor(long s) {
+    private static void waitABit() {
         try {
-            Thread.sleep(s * 1000);
+            Thread.sleep(10 * 1000);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
     private static String transformA(String input) {
-        try {
-            return URLEncoder.encode(input, "UTF-8").toLowerCase();
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
+        return URLEncoder.encode(input, StandardCharsets.UTF_8).toLowerCase();
+    }
+
+    private static String getDate(String date) {
+        Map<String, String> res = new HashMap<>();
+        res.put("Ma", "Monday");
+        res.put("Ti", "Tuesday"); //?
+        res.put("Ke", "Wednesday");
+        res.put("To", "Thursday");
+        res.put("Pe", "Friday"); // ?
+        res.put("La", "Saturday");
+        res.put("Su", "Sunday");
+
+        // Get the current date
+        LocalDate currentDate = LocalDate.now();
+        if (StringUtils.isEmpty(date)) {
+            //Means date is today
+            return "Today, " + currentDate.format(formatter);
+        } else if (date.contains(".")) {
+            //Means date is not in upcoming week
+            // Split the input date string into day and month
+            String[] parts = date.split("\\.");
+            // Get the current year
+            int currentYear = currentDate.getYear();
+            // Create a date string in the format "yyyy-MM-dd"
+            String dateString = currentYear + "-" + parts[1] + "-" + parts[0];
+
+            // Parse the date string into a LocalDate object
+            LocalDate parsedDate = LocalDate.parse(dateString, formatter);
+            return parsedDate.getDayOfWeek().name() + ", " + parsedDate.format(formatter);
+        } else if (res.containsKey(date)) {
+            //Means date is in upcoming week, shows as day of week
+            String weekDay = res.get(date);
+            LocalDate nextDayOfWeek = getNextDayOfWeek(currentDate, weekDay);
+            // Format the next occurrence of the day of the week into the desired format
+            return weekDay + ", " + nextDayOfWeek.format(formatter);
+
+        } else {
+            log("!! Could not get date from " + date);
+            return "";
         }
+
+    }
+
+    private static LocalDate getNextDayOfWeek(LocalDate currentDate, String inputDayOfWeek) {
+        // Parse the input day of the week into a DayOfWeek enum
+        DayOfWeek targetDayOfWeek = DayOfWeek.valueOf(inputDayOfWeek.toUpperCase());
+
+        // Get the current day of the week
+        DayOfWeek currentDayOfWeek = currentDate.getDayOfWeek();
+
+        // Calculate the difference in days between the current day of the week and the target day of the week
+        int daysToAdd = targetDayOfWeek.getValue() - currentDayOfWeek.getValue();
+
+        if (daysToAdd <= 0) {
+            daysToAdd += 7; // Add 7 days to get the next occurrence
+        }
+
+        // Add the calculated number of days to the current date to get the next occurrence of the day of the week
+        return currentDate.plusDays(daysToAdd);
     }
 
 
