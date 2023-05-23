@@ -46,7 +46,6 @@ public class BetAppSimple {
     static DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     public static void main(String[] args) throws Exception {
-        Configuration.remote = "http://localhost:4444/wd/hub";
         Configuration.webdriverLogsEnabled = false;
         Configuration.clickViaJs = true;
         Configuration.headless = false; //Set to false if you want to see browser opening
