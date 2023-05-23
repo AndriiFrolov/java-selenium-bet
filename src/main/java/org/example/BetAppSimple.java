@@ -31,18 +31,13 @@ public class BetAppSimple {
     public static final String PATH_CSV = currentDirectory + File.separator + "result.csv";
     public static final String PATH_EXCEL = currentDirectory + File.separator + "result.xlsx";
     static List<String> urls = Arrays.asList(
-//            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-1-1_Veikkausliiga",
-//            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-1-2_Ykk%C3%B6nen",
-//            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-1-12_Suomen%20cup",
-//            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-1-19_Kakkonen%20Lohko%20A",
-//            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-1-20_Kakkonen%20Lohko%20B",
-//            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-1-21_Kakkonen%20Lohko%20C",
-//            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-1-8_Kansallinen%20Liiga",
-//
-//            //other
-//            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-5-1_Espanja%3B1-5-2_Espanja",
-//            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-2-1_Valioliiga",
-            "https://www.veikkaus.fi/fi/vedonlyonti/pitkaveto?t=1-2-7_FA%20Cup"
+            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-1-1_Veikkausliiga",
+            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-1-2_Ykk%C3%B6nen",
+            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-1-12_Suomen%20cup",
+            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-1-19_Kakkonen%20Lohko%20A",
+            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-1-20_Kakkonen%20Lohko%20B",
+            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-1-21_Kakkonen%20Lohko%20C",
+            "https://www.veikkaus.fi/fi/vedonlyonti?t=1-1-8_Kansallinen%20Liiga"
     );
 
     static String URL = "https://www.bmbets.com/search/?query=";
